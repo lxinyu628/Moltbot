@@ -39,10 +39,18 @@ export default function Home() {
   const bulletsRef = useRef<Bullet[]>([]);
   const enemiesRef = useRef<Enemy[]>([]);
   const starsRef = useRef<Star[]>([]);
+  const audioRef = useRef<{
+    ctx: AudioContext | null;
+    bgOsc1: OscillatorNode | null;
+    bgOsc2: OscillatorNode | null;
+    bgGain: GainNode | null;
+    lastShoot: number;
+  }>({ ctx: null, bgOsc1: null, bgOsc2: null, bgGain: null, lastShoot: 0 });
 
   const [status, setStatus] = useState<GameStatus>("idle");
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
+  const [soundOn, setSoundOn] = useState(true);
   const [canvasSize, setCanvasSize] = useState({
     w: GAME_CONFIG.width,
     h: GAME_CONFIG.height,
@@ -53,6 +61,79 @@ export default function Home() {
     const saved = typeof window !== "undefined" ? localStorage.getItem("moltbot-highscore") : null;
     if (saved) setHighScore(Number(saved) || 0);
   }, []);
+
+  const ensureAudio = () => {
+    if (!soundOn || typeof window === "undefined") return;
+    let ctx = audioRef.current.ctx;
+    if (!ctx) {
+      ctx = new AudioContext();
+      audioRef.current.ctx = ctx;
+    }
+    if (ctx.state === "suspended") ctx.resume();
+    if (!audioRef.current.bgOsc1) {
+      const gain = ctx.createGain();
+      gain.gain.value = 0.04;
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      osc1.type = "sine";
+      osc2.type = "triangle";
+      osc1.frequency.value = 110;
+      osc2.frequency.value = 220;
+      osc2.detune.value = 3;
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+      osc1.start();
+      osc2.start();
+      audioRef.current.bgGain = gain;
+      audioRef.current.bgOsc1 = osc1;
+      audioRef.current.bgOsc2 = osc2;
+    }
+  };
+
+  const stopAudio = () => {
+    const { bgOsc1, bgOsc2, bgGain } = audioRef.current;
+    bgOsc1?.stop();
+    bgOsc2?.stop();
+    bgOsc1?.disconnect();
+    bgOsc2?.disconnect();
+    bgGain?.disconnect();
+    audioRef.current.bgOsc1 = null;
+    audioRef.current.bgOsc2 = null;
+    audioRef.current.bgGain = null;
+  };
+
+  const playTone = (freq: number, duration: number, volume: number, type: OscillatorType) => {
+    if (!soundOn) return;
+    ensureAudio();
+    const ctx = audioRef.current.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
+  };
+
+  const playShoot = () => {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (now - audioRef.current.lastShoot < 120) return;
+    audioRef.current.lastShoot = now;
+    playTone(520, 0.05, 0.05, "square");
+  };
+
+  const playBoom = () => playTone(160, 0.18, 0.08, "sawtooth");
+  const playGameOver = () => playTone(90, 0.35, 0.08, "triangle");
+
+  useEffect(() => {
+    if (!soundOn) stopAudio();
+  }, [soundOn]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -200,6 +281,7 @@ export default function Home() {
           speed: GAME_CONFIG.bulletSpeed,
           r: GAME_CONFIG.bulletRadius,
         });
+        playShoot();
       }
 
       // spawn enemies
@@ -242,6 +324,7 @@ export default function Home() {
             if (e.hp <= 0) {
               enemies.splice(i, 1);
               setScore((s) => s + 10);
+              playBoom();
             }
             break;
           }
@@ -292,11 +375,14 @@ export default function Home() {
       y: GAME_CONFIG.height - 80,
       r: GAME_CONFIG.playerRadius,
     };
+    ensureAudio();
     setStatus("running");
   };
 
   const endGame = () => {
     setStatus("gameover");
+    playGameOver();
+    stopAudio();
     setHighScore((prev) => {
       const next = Math.max(prev, Math.floor(score));
       if (typeof window !== "undefined") {
@@ -335,6 +421,13 @@ export default function Home() {
           <div>得分：{Math.floor(score)}</div>
           <div>最高：{highScore}</div>
         </div>
+
+        <button
+          className="absolute top-3 right-3 text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20"
+          onClick={() => setSoundOn((v) => !v)}
+        >
+          声音：{soundOn ? "开" : "关"}
+        </button>
 
         {status !== "running" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-2xl text-center px-6">
