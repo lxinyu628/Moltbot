@@ -474,6 +474,7 @@ export default function Home() {
           gained += cell.value * 2;
           lastMerged = target;
           moved = true;
+          target++;
         } else {
           if (c !== target) moved = true;
           next[r][target] = { ...cell };
@@ -515,13 +516,14 @@ export default function Home() {
     if (!moved) return;
     nextBoard = addRandomTile(nextBoard);
     setBoard(nextBoard);
-    setScore2048((s) => s + gained);
-
-    const newScore = score2048 + gained;
-    setBest2048((prev) => {
-      const next = Math.max(prev, newScore);
-      if (typeof window !== "undefined") localStorage.setItem("moltbot-2048-best", String(next));
-      return next;
+    setScore2048((s) => {
+      const newScore = s + gained;
+      setBest2048((prev) => {
+        const next = Math.max(prev, newScore);
+        if (typeof window !== "undefined") localStorage.setItem("moltbot-2048-best", String(next));
+        return next;
+      });
+      return newScore;
     });
 
     if (!canMove(nextBoard)) setGameOver2048(true);
