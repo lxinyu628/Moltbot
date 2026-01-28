@@ -430,92 +430,99 @@ export default function Home() {
   };
 
   // 2048 helpers
-  function createEmptyBoard(): Tile[][] {
-    return Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => null));
+  function createEmptyNumbers(): number[][] {
+    return Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => 0));
   }
 
-  function cloneBoard(b: Tile[][]): Tile[][] {
-    return b.map((row) => row.map((cell) => (cell ? { ...cell } : null)));
+  function numbersFromTiles(b: Tile[][]): number[][] {
+    return b.map((row) => row.map((cell) => (cell ? cell.value : 0)));
   }
 
-  function addRandomTile(b: Tile[][]): Tile[][] {
+  function tilesFromNumbers(nums: number[][]): Tile[][] {
+    return nums.map((row) =>
+      row.map((v) => (v > 0 ? { id: tileIdRef.current++, value: v } : null))
+    );
+  }
+
+  function addRandomNumber(nums: number[][]): number[][] {
     const empty: { r: number; c: number }[] = [];
-    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) if (!b[r][c]) empty.push({ r, c });
-    if (empty.length === 0) return b;
+    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) if (nums[r][c] === 0) empty.push({ r, c });
+    if (empty.length === 0) return nums;
     const pick = empty[Math.floor(Math.random() * empty.length)];
     const value = Math.random() < 0.9 ? 2 : 4;
-    const next = cloneBoard(b);
-    next[pick.r][pick.c] = { id: tileIdRef.current++, value };
+    const next = nums.map((row) => row.slice());
+    next[pick.r][pick.c] = value;
     return next;
   }
 
-  function canMove(b: Tile[][]): boolean {
+  function canMoveNumbers(nums: number[][]): boolean {
     for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
-      if (!b[r][c]) return true;
-      const v = b[r][c]!.value;
-      if (r < SIZE - 1 && b[r + 1][c] && b[r + 1][c]!.value === v) return true;
-      if (c < SIZE - 1 && b[r][c + 1] && b[r][c + 1]!.value === v) return true;
+      if (nums[r][c] === 0) return true;
+      const v = nums[r][c];
+      if (r < SIZE - 1 && nums[r + 1][c] === v) return true;
+      if (c < SIZE - 1 && nums[r][c + 1] === v) return true;
     }
     return false;
   }
 
-  function moveLeft(b: Tile[][]): { board: Tile[][]; gained: number; moved: boolean } {
+  function slideAndMerge(line: number[]): { line: number[]; gained: number } {
+    const nonZero = line.filter((v) => v > 0);
+    const merged: number[] = [];
     let gained = 0;
-    let moved = false;
-    const next = createEmptyBoard();
-    for (let r = 0; r < SIZE; r++) {
-      let target = 0;
-      let lastMerged = -1;
-      for (let c = 0; c < SIZE; c++) {
-        const cell = b[r][c];
-        if (!cell) continue;
-        if (next[r][target] && next[r][target]!.value === cell.value && lastMerged !== target) {
-          next[r][target] = { id: tileIdRef.current++, value: cell.value * 2 };
-          gained += cell.value * 2;
-          lastMerged = target;
-          moved = true;
-          target++;
-        } else {
-          if (c !== target) moved = true;
-          next[r][target] = { ...cell };
-          target++;
-        }
+    for (let i = 0; i < nonZero.length; i++) {
+      const curr = nonZero[i];
+      const next = nonZero[i + 1];
+      if (next && next === curr) {
+        merged.push(curr * 2);
+        gained += curr * 2;
+        i++;
+      } else {
+        merged.push(curr);
       }
     }
-    return { board: next, gained, moved };
+    while (merged.length < SIZE) merged.push(0);
+    return { line: merged, gained };
   }
 
-  function rotateRight(b: Tile[][]): Tile[][] {
-    const res = createEmptyBoard();
-    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) res[c][SIZE - 1 - r] = b[r][c] ? { ...b[r][c]! } : null;
+  function rotateRightNumbers(nums: number[][]): number[][] {
+    const res = createEmptyNumbers();
+    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) res[c][SIZE - 1 - r] = nums[r][c];
     return res;
   }
 
-  function rotateLeft(b: Tile[][]): Tile[][] {
-    const res = createEmptyBoard();
-    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) res[SIZE - 1 - c][r] = b[r][c] ? { ...b[r][c]! } : null;
+  function rotateLeftNumbers(nums: number[][]): number[][] {
+    const res = createEmptyNumbers();
+    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) res[SIZE - 1 - c][r] = nums[r][c];
     return res;
   }
 
   function move(dir: "left" | "right" | "up" | "down") {
     if (gameOver2048) return;
-    let working = cloneBoard(board);
-    if (dir === "right") working = rotateRight(rotateRight(working));
-    if (dir === "up") working = rotateLeft(working);
-    if (dir === "down") working = rotateRight(working);
+    let nums = numbersFromTiles(board);
 
-    const result = moveLeft(working);
-    let nextBoard = result.board;
-    const gained = result.gained;
-    const moved = result.moved;
+    if (dir === "right") nums = rotateRightNumbers(rotateRightNumbers(nums));
+    if (dir === "up") nums = rotateLeftNumbers(nums);
+    if (dir === "down") nums = rotateRightNumbers(nums);
 
-    if (dir === "right") nextBoard = rotateRight(rotateRight(nextBoard));
-    if (dir === "up") nextBoard = rotateRight(nextBoard);
-    if (dir === "down") nextBoard = rotateLeft(nextBoard);
+    let gained = 0;
+    const nextNums = nums.map((row) => {
+      const result = slideAndMerge(row);
+      gained += result.gained;
+      return result.line;
+    });
 
+    let restored = nextNums;
+    if (dir === "right") restored = rotateRightNumbers(rotateRightNumbers(restored));
+    if (dir === "up") restored = rotateRightNumbers(restored);
+    if (dir === "down") restored = rotateLeftNumbers(restored);
+
+    const original = numbersFromTiles(board);
+    const moved = restored.some((row, r) => row.some((v, c) => v !== original[r][c]));
     if (!moved) return;
-    nextBoard = addRandomTile(nextBoard);
-    setBoard(nextBoard);
+
+    const withRandom = addRandomNumber(restored);
+    setBoard(tilesFromNumbers(withRandom));
+
     setScore2048((s) => {
       const newScore = s + gained;
       setBest2048((prev) => {
@@ -526,14 +533,14 @@ export default function Home() {
       return newScore;
     });
 
-    if (!canMove(nextBoard)) setGameOver2048(true);
+    if (!canMoveNumbers(withRandom)) setGameOver2048(true);
   }
 
   function reset2048() {
     tileIdRef.current = 1;
-    let b = createEmptyBoard();
-    b = addRandomTile(addRandomTile(b));
-    setBoard(b);
+    let nums = createEmptyNumbers();
+    nums = addRandomNumber(addRandomNumber(nums));
+    setBoard(tilesFromNumbers(nums));
     setScore2048(0);
     setGameOver2048(false);
   }
