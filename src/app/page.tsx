@@ -65,7 +65,7 @@ export default function Home() {
   });
 
   // 2048 state
-  const [board, setBoard] = useState<Tile[][]>(() => createEmptyBoard());
+  const [board, setBoard] = useState<Tile[][]>(() => createEmptyNumbers().map((row) => row.map(() => null)));
   const [score2048, setScore2048] = useState(0);
   const [best2048, setBest2048] = useState(0);
   const [gameOver2048, setGameOver2048] = useState(false);
