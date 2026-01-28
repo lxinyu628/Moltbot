@@ -108,13 +108,34 @@ export default function Home() {
 
       // player
       const p = playerRef.current;
+      const pr = p.r;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+
+      // body
       ctx.fillStyle = "#38bdf8";
       ctx.beginPath();
-      ctx.moveTo(p.x, p.y - p.r);
-      ctx.lineTo(p.x - p.r, p.y + p.r);
-      ctx.lineTo(p.x + p.r, p.y + p.r);
+      ctx.moveTo(0, -pr * 1.4);
+      ctx.lineTo(-pr * 0.35, pr * 0.9);
+      ctx.lineTo(pr * 0.35, pr * 0.9);
       ctx.closePath();
       ctx.fill();
+
+      // wings
+      ctx.fillStyle = "#22d3ee";
+      ctx.beginPath();
+      ctx.moveTo(-pr * 1.2, pr * 0.1);
+      ctx.lineTo(0, pr * 0.4);
+      ctx.lineTo(pr * 1.2, pr * 0.1);
+      ctx.closePath();
+      ctx.fill();
+
+      // cockpit
+      ctx.fillStyle = "#0ea5e9";
+      ctx.beginPath();
+      ctx.ellipse(0, -pr * 0.4, pr * 0.25, pr * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
 
       // bullets
       ctx.fillStyle = "#fbbf24";
@@ -126,10 +147,33 @@ export default function Home() {
 
       // enemies
       enemiesRef.current.forEach((e) => {
+        ctx.save();
+        ctx.translate(e.x, e.y);
         ctx.fillStyle = e.hp > 1 ? "#fb7185" : "#f97316";
+
+        // body
         ctx.beginPath();
-        ctx.rect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2);
+        ctx.moveTo(0, e.r * 1.2);
+        ctx.lineTo(-e.r * 0.5, -e.r * 0.8);
+        ctx.lineTo(e.r * 0.5, -e.r * 0.8);
+        ctx.closePath();
         ctx.fill();
+
+        // wings
+        ctx.fillStyle = e.hp > 1 ? "#fda4af" : "#fdba74";
+        ctx.beginPath();
+        ctx.moveTo(-e.r * 1.1, -e.r * 0.2);
+        ctx.lineTo(0, -e.r * 0.05);
+        ctx.lineTo(e.r * 1.1, -e.r * 0.2);
+        ctx.closePath();
+        ctx.fill();
+
+        // cockpit
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+        ctx.beginPath();
+        ctx.arc(0, 0, e.r * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       });
     };
 
